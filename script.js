@@ -953,7 +953,7 @@
         refreshDistrictStopSelectors();
 
         if (usingSharedDatabase()) {
-          showMessage("stopSuccess", "Bus stop saved online. It will show on mobile and laptop.");
+          showMessage("stopSuccess", "Bus stop saved online. It will show for all users.");
         } else {
           showMessage("stopError", "Bus stop saved only in this browser. Open the Firebase-hosted website and check Firestore setup.");
         }
@@ -1001,7 +1001,7 @@
         await savePendingTiming(timing);
         form.reset();
         if (usingSharedDatabase()) {
-          showMessage("updateSuccess", "Timing saved online. Open Admin on your laptop and approve it.");
+          showMessage("updateSuccess", "Timing saved online. Open Admin and approve it.");
         } else {
           showMessage("updateError", "Timing saved only in this browser. Open the Firebase-hosted website and check Firestore setup.");
         }
