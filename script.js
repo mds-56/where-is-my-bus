@@ -2,6 +2,13 @@
   const BUS_KEY = "whereIsMyBus_timings";
   const STOP_KEY = "whereIsMyBus_userStops";
   const ADMIN_KEY = "whereIsMyBus_adminLoggedIn";
+  const TIMINGS_COLLECTION = "timings";
+  const STOPS_COLLECTION = "busStops";
+
+  let firestoreDb = null;
+  let firestoreEnabled = false;
+  let timingsCache = [];
+  let userStopsCache = [];
 
   const districtStops = [
     { district: "Ariyalur", stops: ["Ariyalur Bus Stand", "Jayankondam", "Sendurai"] },
@@ -398,8 +405,8 @@
     }
   ];
 
-  document.addEventListener("DOMContentLoaded", () => {
-    seedData();
+  document.addEventListener("DOMContentLoaded", async () => {
+    await initializeDataStore();
     setupNavigation();
     setDefaultDates();
     fillPlaceLists();
@@ -412,9 +419,44 @@
     setupAdmin();
   });
 
-  function seedData() {
+  async function initializeDataStore() {
+    if (window.firebase && firebase.apps && firebase.apps.length && firebase.firestore) {
+      try {
+        firestoreDb = firebase.firestore();
+        firestoreEnabled = true;
+        await loadFirestoreData();
+        if (!timingsCache.length) {
+          await saveTimings(sampleTimings);
+        }
+        return;
+      } catch (error) {
+        console.warn("Firestore unavailable, using browser storage fallback.", error);
+        firestoreDb = null;
+        firestoreEnabled = false;
+      }
+    }
+
+    seedLocalData();
+    timingsCache = JSON.parse(localStorage.getItem(BUS_KEY) || "[]").map(normalizeTiming);
+    userStopsCache = JSON.parse(localStorage.getItem(STOP_KEY) || "[]").map(normalizeStop);
+  }
+
+  async function loadFirestoreData() {
+    const [timingsSnapshot, stopsSnapshot] = await Promise.all([
+      firestoreDb.collection(TIMINGS_COLLECTION).get(),
+      firestoreDb.collection(STOPS_COLLECTION).get()
+    ]);
+
+    timingsCache = timingsSnapshot.docs.map((doc) => normalizeTiming({ id: doc.id, ...doc.data() }));
+    userStopsCache = stopsSnapshot.docs.map((doc) => normalizeStop({ id: doc.id, ...doc.data() }));
+
+    localStorage.setItem(BUS_KEY, JSON.stringify(timingsCache));
+    localStorage.setItem(STOP_KEY, JSON.stringify(userStopsCache));
+  }
+
+  function seedLocalData() {
     if (!localStorage.getItem(BUS_KEY)) {
-      saveTimings(sampleTimings);
+      localStorage.setItem(BUS_KEY, JSON.stringify(sampleTimings));
       return;
     }
 
@@ -427,41 +469,66 @@
     sampleTimings.forEach((timing) => {
       if (!existingIds.has(timing.id)) upgraded.push(timing);
     });
-    saveTimings(upgraded);
+    localStorage.setItem(BUS_KEY, JSON.stringify(upgraded));
   }
 
   function getTimings() {
-    return JSON.parse(localStorage.getItem(BUS_KEY) || "[]").map(normalizeTiming);
+    return timingsCache.map(normalizeTiming);
   }
 
-  function saveTimings(timings) {
-    localStorage.setItem(BUS_KEY, JSON.stringify(timings));
+  async function saveTimings(timings) {
+    timingsCache = timings.map(normalizeTiming);
+    localStorage.setItem(BUS_KEY, JSON.stringify(timingsCache));
+    if (firestoreEnabled) await syncCollection(TIMINGS_COLLECTION, timingsCache);
   }
 
   function getUserStops() {
-    return JSON.parse(localStorage.getItem(STOP_KEY) || "[]").map((stop) => ({
-      district: canonicalPlace(stop.district),
-      stopName: canonicalPlace(stop.stopName),
-      createdAt: stop.createdAt || today()
-    }));
+    return userStopsCache.map(normalizeStop);
   }
 
-  function saveUserStops(stops) {
+  async function saveUserStops(stops) {
     const unique = [];
     const seen = new Set();
     stops.forEach((stop) => {
-      const normalizedStop = {
-        district: canonicalPlace(stop.district),
-        stopName: canonicalPlace(stop.stopName),
-        createdAt: stop.createdAt || today()
-      };
+      const normalizedStop = normalizeStop(stop);
       const key = `${normalize(normalizedStop.district)}|${normalize(normalizedStop.stopName)}`;
       if (normalizedStop.district && normalizedStop.stopName && !seen.has(key)) {
         seen.add(key);
         unique.push(normalizedStop);
       }
     });
+    userStopsCache = unique;
     localStorage.setItem(STOP_KEY, JSON.stringify(unique));
+    if (firestoreEnabled) await syncCollection(STOPS_COLLECTION, unique);
+  }
+
+  async function syncCollection(collectionName, records) {
+    const collection = firestoreDb.collection(collectionName);
+    const snapshot = await collection.get();
+    const desiredIds = new Set(records.map((record) => record.id));
+    const batch = firestoreDb.batch();
+
+    snapshot.docs.forEach((doc) => {
+      if (!desiredIds.has(doc.id)) batch.delete(doc.ref);
+    });
+
+    records.forEach((record) => {
+      batch.set(collection.doc(record.id), record);
+    });
+
+    await batch.commit();
+  }
+
+  function normalizeStop(stop) {
+    const district = canonicalPlace(stop.district);
+    const stopName = canonicalPlace(stop.stopName);
+    return {
+      ...stop,
+      id: stop.id || `${normalize(district)}-${normalize(stopName)}`.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+      district,
+      stopName,
+      createdAt: stop.createdAt || today()
+    };
   }
 
   function today() {
@@ -723,7 +790,7 @@
     const form = document.getElementById("stopForm");
     if (!form) return;
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const data = new FormData(form);
       const stop = {
@@ -732,7 +799,7 @@
         createdAt: today()
       };
 
-      saveUserStops([...getUserStops(), stop]);
+      await saveUserStops([...getUserStops(), stop]);
       form.reset();
       fillPlaceLists();
       refreshDistrictStopSelectors();
@@ -764,7 +831,7 @@
     const form = document.getElementById("timingForm");
     if (!form) return;
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const timing = timingFromForm(form, "pending");
       const timings = getTimings();
@@ -781,7 +848,7 @@
         timings.push(timing);
       }
 
-      saveTimings(timings);
+      await saveTimings(timings);
       form.reset();
       const success = document.getElementById("updateSuccess");
       if (success) {
@@ -850,30 +917,30 @@
       showPanel();
     });
 
-    resetBtn.addEventListener("click", () => {
+    resetBtn.addEventListener("click", async () => {
       if (confirm("Reset timings to the loaded TNSTC data?")) {
-        saveTimings(sampleTimings);
+        await saveTimings(sampleTimings);
         renderAdminLists();
       }
     });
 
-    document.addEventListener("click", (event) => {
+    document.addEventListener("click", async (event) => {
       const button = event.target.closest("[data-admin-action]");
       if (!button) return;
 
       const id = button.dataset.id;
       const action = button.dataset.adminAction;
-      if (action === "approve") approveTiming(id);
-      if (action === "delete") deleteTiming(id);
+      if (action === "approve") await approveTiming(id);
+      if (action === "delete") await deleteTiming(id);
       if (action === "edit") openEditDialog(id);
-      if (action === "delete-stop") deleteUserStop(id);
+      if (action === "delete-stop") await deleteUserStop(id);
     });
 
-    editForm.addEventListener("submit", (event) => {
+    editForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const updated = timingFromForm(editForm, editForm.elements.status.value);
       const timings = getTimings().map((item) => item.id === updated.id ? updated : item);
-      saveTimings(timings);
+      await saveTimings(timings);
       editDialog.close();
       renderAdminLists();
     });
@@ -924,10 +991,10 @@
     `;
   }
 
-  function deleteUserStop(id) {
+  async function deleteUserStop(id) {
     if (!confirm("Remove this user-created bus stop?")) return;
     const stops = getUserStops().filter((stop) => stopKey(stop) !== id);
-    saveUserStops(stops);
+    await saveUserStops(stops);
     fillPlaceLists();
     renderAdminLists();
   }
@@ -936,18 +1003,18 @@
     return `${normalize(stop.district)}|${normalize(stop.stopName)}`;
   }
 
-  function approveTiming(id) {
+  async function approveTiming(id) {
     const timings = getTimings().map((timing) => {
       if (timing.id !== id) return timing;
       return { ...timing, status: "approved", lastUpdated: today() };
     });
-    saveTimings(timings);
+    await saveTimings(timings);
     renderAdminLists();
   }
 
-  function deleteTiming(id) {
+  async function deleteTiming(id) {
     if (!confirm("Delete this timing?")) return;
-    saveTimings(getTimings().filter((timing) => timing.id !== id));
+    await saveTimings(getTimings().filter((timing) => timing.id !== id));
     renderAdminLists();
   }
 
@@ -1013,9 +1080,15 @@
   }
 
   function normalizeTiming(timing) {
+    const from = canonicalPlace(timing.from);
+    const to = canonicalPlace(timing.to);
+    const id = timing.id || `bus-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     return {
       ...timing,
-      busName: timing.busName || `${timing.type || "Bus"} ${timing.from || ""} - ${timing.to || ""}`.trim(),
+      id,
+      from,
+      to,
+      busName: timing.busName || `${timing.type || "Bus"} ${from || ""} - ${to || ""}`.trim(),
       fare: timing.fare || "Not updated",
       duration: timing.duration || calculateDuration(timing.departure, timing.arrival),
       busStops: timing.busStops || timing.routeDetails || "Stop details not updated"
