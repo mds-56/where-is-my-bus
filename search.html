@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="View Tamil Nadu bus timing search results with bus number, route, departure, arrival, duration, fare, and stop details.">
+  <title>Search Results | Where is my bus?</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="navbar">
+      <a class="brand" href="index.html"><span class="brand-mark">TN</span><span>Where is my bus?</span></a>
+      <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false">☰</button>
+      <div class="nav-links">
+        <a href="index.html">Home</a>
+        <a class="active" href="search.html">Search</a>
+        <a href="update.html">Update Timing</a>
+        <a href="admin.html">Admin</a>
+        <a href="about.html">About</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="page-title">
+      <p class="eyebrow">Find services</p>
+      <h1>Search bus timings</h1>
+    </section>
+
+    <form class="search-panel compact" data-search-form>
+      <div class="form-grid">
+        <label>
+          <span>From district</span>
+          <select name="fromDistrict" data-district-select data-target="from" required>
+            <option value="">Select district</option>
+          </select>
+        </label>
+        <label>
+          <span>From bus stop</span>
+          <select name="from" data-stop-select required>
+            <option value="">Select bus stop</option>
+          </select>
+        </label>
+        <label>
+          <span>To district</span>
+          <select name="toDistrict" data-district-select data-target="to" required>
+            <option value="">Select district</option>
+          </select>
+        </label>
+        <label>
+          <span>To bus stop</span>
+          <select name="to" data-stop-select required>
+            <option value="">Select bus stop</option>
+          </select>
+        </label>
+        <label>
+          <span>Travel date</span>
+          <input type="date" name="date" required>
+        </label>
+        <label>
+          <span>Bus type</span>
+          <select name="type">
+            <option value="All">All</option>
+            <option value="Government">Government</option>
+            <option value="Private">Private</option>
+          </select>
+        </label>
+      </div>
+      <button class="btn primary" type="submit">Search</button>
+      <p class="public-note">Timings may change due to traffic, road conditions, and operator changes. Please confirm before travel.</p>
+    </form>
+
+    <section class="results-toolbar">
+      <div>
+        <h2 id="resultsTitle">Available buses</h2>
+        <p id="resultsMeta">Showing approved timings from local storage.</p>
+      </div>
+      <a class="btn secondary" href="update.html">Add Timing</a>
+    </section>
+
+    <section class="cards-grid" id="resultsList"></section>
+  </main>
+
+  <datalist id="placeList"></datalist>
+
+  <footer class="footer">
+    <p>Contact: whereismybus.support@gmail.com | +91 98765 43210</p>
+    <p>Built for Tamil Nadu bus passengers.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Search Tamil Nadu bus timings by district, bus stop, date, and bus type. Community updated timing information for public travel.">
+  <title>Where is my bus? | Tamil Nadu Bus Timing Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="navbar">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">TN</span>
+        <span>Where is my bus?</span>
+      </a>
+      <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false">☰</button>
+      <div class="nav-links">
+        <a class="active" href="index.html">Home</a>
+        <a href="search.html">Search</a>
+        <a href="update.html">Update Timing</a>
+        <a href="admin.html">Admin</a>
+        <a href="about.html">About</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-content">
+        <p class="eyebrow">Tamil Nadu public travel assistant</p>
+        <h1>Where is my bus?</h1>
+        <p class="hero-subtitle">Tamil Nadu Bus Timing Finder</p>
+        <form class="search-panel" data-search-form>
+          <div class="form-grid">
+            <label>
+              <span>From district</span>
+              <select name="fromDistrict" data-district-select data-target="from" required>
+                <option value="">Select district</option>
+              </select>
+            </label>
+            <label>
+              <span>From bus stop</span>
+              <select name="from" data-stop-select required>
+                <option value="">Select bus stop</option>
+              </select>
+            </label>
+            <label>
+              <span>To district</span>
+              <select name="toDistrict" data-district-select data-target="to" required>
+                <option value="">Select district</option>
+              </select>
+            </label>
+            <label>
+              <span>To bus stop</span>
+              <select name="to" data-stop-select required>
+                <option value="">Select bus stop</option>
+              </select>
+            </label>
+            <label>
+              <span>Travel date</span>
+              <input type="date" name="date" required>
+            </label>
+            <label>
+              <span>Bus type</span>
+              <select name="type">
+                <option value="All">All</option>
+                <option value="Government">Government</option>
+                <option value="Private">Private</option>
+              </select>
+            </label>
+          </div>
+          <button class="btn primary" type="submit">Search Buses</button>
+          <p class="public-note">Timing and fare details are informational. No online ticket booking or payment is collected on this website.</p>
+        </form>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Fast searches</p>
+        <h2>Popular Tamil Nadu routes</h2>
+      </div>
+      <div class="route-grid" id="popularRoutes"></div>
+    </section>
+
+    <section class="info-band">
+      <div>
+        <h2>Keep timings useful for everyone</h2>
+        <p>Found a changed departure time or a new service? Submit it from the Update Timing page. Approved updates help other passengers plan better.</p>
+      </div>
+      <a class="btn light" href="update.html">Update Timing</a>
+    </section>
+  </main>
+
+  <datalist id="placeList"></datalist>
+
+  <footer class="footer">
+    <p>Contact: whereismybus.support@gmail.com | +91 98765 43210</p>
+    <p>Built for Tamil Nadu bus passengers.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Submit Tamil Nadu bus timing updates and add missing bus stops for Where is my bus.">
+  <title>Update Timing | Where is my bus?</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="navbar">
+      <a class="brand" href="index.html"><span class="brand-mark">TN</span><span>Where is my bus?</span></a>
+      <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false">☰</button>
+      <div class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="search.html">Search</a>
+        <a class="active" href="update.html">Update Timing</a>
+        <a href="admin.html">Admin</a>
+        <a href="about.html">About</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="page narrow">
+    <section class="page-title">
+      <p class="eyebrow">Community update</p>
+      <h1>Update bus timing</h1>
+      <p>Submit a new timing or correction. Bus stops appear immediately; timing updates appear publicly after admin approval.</p>
+    </section>
+
+    <div class="alert success hidden" id="updateSuccess">Timing submitted successfully. Admin approval is pending.</div>
+    <div class="alert success hidden" id="stopSuccess">Bus stop added. You can now use it in From, To, and Bus stop names.</div>
+
+    <section class="stop-panel">
+      <h2>Create new bus stop</h2>
+      <p>Add missing local bus stops here. The stop will be available immediately in search and timing forms.</p>
+      <form class="data-form" id="stopForm">
+        <div class="form-grid two">
+          <label>
+            <span>District</span>
+            <select name="district" required>
+              <option value="">Select district</option>
+              <option value="Ariyalur">Ariyalur</option>
+              <option value="Chengalpattu">Chengalpattu</option>
+              <option value="Chennai">Chennai</option>
+              <option value="Coimbatore">Coimbatore</option>
+              <option value="Cuddalore">Cuddalore</option>
+              <option value="Dharmapuri">Dharmapuri</option>
+              <option value="Dindigul">Dindigul</option>
+              <option value="Erode">Erode</option>
+              <option value="Kallakurichi">Kallakurichi</option>
+              <option value="Kancheepuram">Kancheepuram</option>
+              <option value="Kanniyakumari">Kanniyakumari</option>
+              <option value="Karur">Karur</option>
+              <option value="Krishnagiri">Krishnagiri</option>
+              <option value="Madurai">Madurai</option>
+              <option value="Mayiladuthurai">Mayiladuthurai</option>
+              <option value="Nagapattinam">Nagapattinam</option>
+              <option value="Namakkal">Namakkal</option>
+              <option value="Nilgiris">Nilgiris</option>
+              <option value="Perambalur">Perambalur</option>
+              <option value="Pudukkottai">Pudukkottai</option>
+              <option value="Ramanathapuram">Ramanathapuram</option>
+              <option value="Ranipet">Ranipet</option>
+              <option value="Salem">Salem</option>
+              <option value="Sivagangai">Sivagangai</option>
+              <option value="Tenkasi">Tenkasi</option>
+              <option value="Thanjavur">Thanjavur</option>
+              <option value="Theni">Theni</option>
+              <option value="Thoothukudi">Thoothukudi</option>
+              <option value="Tiruchirappalli">Tiruchirappalli</option>
+              <option value="Tirunelveli">Tirunelveli</option>
+              <option value="Tirupathur">Tirupathur</option>
+              <option value="Tiruppur">Tiruppur</option>
+              <option value="Tiruvallur">Tiruvallur</option>
+              <option value="Tiruvannamalai">Tiruvannamalai</option>
+              <option value="Tiruvarur">Tiruvarur</option>
+              <option value="Vellore">Vellore</option>
+              <option value="Viluppuram">Viluppuram</option>
+              <option value="Virudhunagar">Virudhunagar</option>
+            </select>
+          </label>
+          <label>
+            <span>Bus stop name</span>
+            <input type="text" name="stopName" placeholder="New Bus Stop" required>
+          </label>
+        </div>
+        <button class="btn secondary" type="submit">Add Bus Stop</button>
+      </form>
+    </section>
+
+    <form class="data-form" id="timingForm" data-stop-picker-form>
+      <div class="form-grid two">
+        <label>
+          <span>Bus number</span>
+          <input type="text" name="busNumber" placeholder="TNSTC 102" required>
+        </label>
+        <label>
+          <span>Bus name</span>
+          <input type="text" name="busName" placeholder="TNSTC Express" required>
+        </label>
+        <label>
+          <span>Bus type</span>
+          <select name="type" required>
+            <option value="">Select type</option>
+            <option value="Government">Government</option>
+            <option value="Private">Private</option>
+          </select>
+        </label>
+        <label>
+          <span>From district</span>
+          <select name="fromDistrict" data-district-select data-target="from" required>
+            <option value="">Select district</option>
+          </select>
+        </label>
+        <label>
+          <span>From bus stop</span>
+          <select name="from" data-stop-select required>
+            <option value="">Select bus stop</option>
+          </select>
+        </label>
+        <label>
+          <span>To district</span>
+          <select name="toDistrict" data-district-select data-target="to" required>
+            <option value="">Select district</option>
+          </select>
+        </label>
+        <label>
+          <span>To bus stop</span>
+          <select name="to" data-stop-select required>
+            <option value="">Select bus stop</option>
+          </select>
+        </label>
+        <label>
+          <span>Departure time</span>
+          <input type="time" name="departure" required>
+        </label>
+        <label>
+          <span>Arrival time</span>
+          <input type="time" name="arrival" required>
+        </label>
+        <label>
+          <span>Ticket cost</span>
+          <input type="number" name="fare" min="0" step="1" placeholder="85" required>
+        </label>
+        <label>
+          <span>Travel duration</span>
+          <input type="text" name="duration" placeholder="1 hr 55 min" required>
+        </label>
+      </div>
+      <label>
+        <span>Route details</span>
+        <textarea name="routeDetails" rows="4" placeholder="Via Omalur, Mettur road..." required></textarea>
+      </label>
+      <label>
+        <span>Bus stop names</span>
+        <textarea name="busStops" rows="4" placeholder="Dharmapuri Bus Stand, Thoppur, Omalur, Salem New Bus Stand" required></textarea>
+      </label>
+      <label>
+        <span>Notes</span>
+        <textarea name="notes" rows="3" placeholder="Runs daily, express service, platform info. No payment or booking is available on this website."></textarea>
+      </label>
+      <button class="btn primary" type="submit">Submit Timing</button>
+    </form>
+  </main>
+
+  <datalist id="placeList"></datalist>
+
+  <footer class="footer">
+    <p>Contact: whereismybus.support@gmail.com | +91 98765 43210</p>
+    <p>Built for Tamil Nadu bus passengers.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Admin | Where is my bus?</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="navbar">
+      <a class="brand" href="index.html"><span class="brand-mark">TN</span><span>Where is my bus?</span></a>
+      <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false">☰</button>
+      <div class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="search.html">Search</a>
+        <a href="update.html">Update Timing</a>
+        <a class="active" href="admin.html">Admin</a>
+        <a href="about.html">About</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="page-title">
+      <p class="eyebrow">Admin panel</p>
+      <h1>Manage bus timings</h1>
+      <p>Authorized administrators can review submitted timings and remove incorrect user-created bus stops.</p>
+    </section>
+
+    <section class="admin-login" id="adminLogin">
+      <form class="data-form login-card" id="loginForm">
+        <label>
+          <span>Username</span>
+          <input type="text" name="username" autocomplete="username" required>
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <p class="form-error hidden" id="loginError">Invalid login details.</p>
+        <button class="btn primary" type="submit">Login</button>
+      </form>
+    </section>
+
+    <section class="admin-panel hidden" id="adminPanel">
+      <div class="results-toolbar">
+        <div>
+          <h2>Submitted timings</h2>
+          <p>Approve, edit, or delete user submissions.</p>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn secondary" id="logoutBtn" type="button">Logout</button>
+          <button class="btn ghost" id="resetDataBtn" type="button">Reset TNSTC Data</button>
+        </div>
+      </div>
+      <div class="admin-columns">
+        <section>
+          <h3>Pending approval</h3>
+          <div class="cards-grid single" id="pendingList"></div>
+        </section>
+        <section>
+          <h3>Approved timings</h3>
+          <div class="cards-grid single" id="approvedList"></div>
+        </section>
+      </div>
+      <section class="stop-admin-panel">
+        <h3>User-created bus stops</h3>
+        <p>Bus stops added by users appear immediately. Admin can remove wrong or duplicate stops here.</p>
+        <div class="cards-grid single" id="userStopsList"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog class="edit-dialog" id="editDialog">
+    <form class="data-form" id="editForm" method="dialog">
+      <h2>Edit timing</h2>
+      <input type="hidden" name="id">
+      <input type="hidden" name="status">
+      <div class="form-grid two">
+        <label>
+          <span>Bus number</span>
+          <input type="text" name="busNumber" required>
+        </label>
+        <label>
+          <span>Bus name</span>
+          <input type="text" name="busName" required>
+        </label>
+        <label>
+          <span>Bus type</span>
+          <select name="type" required>
+            <option value="Government">Government</option>
+            <option value="Private">Private</option>
+          </select>
+        </label>
+        <label>
+          <span>From</span>
+          <input type="text" name="from" required>
+        </label>
+        <label>
+          <span>To</span>
+          <input type="text" name="to" required>
+        </label>
+        <label>
+          <span>Departure time</span>
+          <input type="time" name="departure" required>
+        </label>
+        <label>
+          <span>Arrival time</span>
+          <input type="time" name="arrival" required>
+        </label>
+        <label>
+          <span>Ticket cost</span>
+          <input type="number" name="fare" min="0" step="1" required>
+        </label>
+        <label>
+          <span>Travel duration</span>
+          <input type="text" name="duration" required>
+        </label>
+      </div>
+      <label>
+        <span>Route details</span>
+        <textarea name="routeDetails" rows="3" required></textarea>
+      </label>
+      <label>
+        <span>Bus stop names</span>
+        <textarea name="busStops" rows="3" required></textarea>
+      </label>
+      <label>
+        <span>Notes</span>
+        <textarea name="notes" rows="3"></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button class="btn ghost" value="cancel" type="button" id="cancelEditBtn">Cancel</button>
+        <button class="btn primary" value="default" type="submit">Save Changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="footer">
+    <p>Contact: whereismybus.support@gmail.com | +91 98765 43210</p>
+    <p>Built for Tamil Nadu bus passengers.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
