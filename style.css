@@ -490,6 +490,12 @@ textarea:focus {
   border: 1px solid #b9e7cc;
 }
 
+.alert.error {
+  color: #9f1d1d;
+  background: #fff0f0;
+  border: 1px solid #f0b8b8;
+}
+
 .form-error {
   margin: 0;
   color: #c93232;

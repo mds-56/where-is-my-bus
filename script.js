@@ -2,12 +2,14 @@
   const BUS_KEY = "whereIsMyBus_timings";
   const STOP_KEY = "whereIsMyBus_userStops";
   const ADMIN_KEY = "whereIsMyBus_adminLoggedIn";
-  const TIMINGS_COLLECTION = "timings";
+  const PENDING_COLLECTION = "pendingTimings";
+  const APPROVED_COLLECTION = "approvedTimings";
   const STOPS_COLLECTION = "busStops";
 
   let firestoreDb = null;
   let firestoreEnabled = false;
-  let timingsCache = [];
+  let pendingTimingsCache = [];
+  let approvedTimingsCache = [];
   let userStopsCache = [];
 
   const districtStops = [
@@ -417,6 +419,7 @@
     setupStopForm();
     setupTimingForm();
     setupAdmin();
+    updateStorageLabels();
   });
 
   async function initializeDataStore() {
@@ -425,8 +428,8 @@
         firestoreDb = firebase.firestore();
         firestoreEnabled = true;
         await loadFirestoreData();
-        if (!timingsCache.length) {
-          await saveTimings(sampleTimings);
+        if (!approvedTimingsCache.length) {
+          await seedApprovedTimings(sampleTimings);
         }
         return;
       } catch (error) {
@@ -437,21 +440,37 @@
     }
 
     seedLocalData();
-    timingsCache = JSON.parse(localStorage.getItem(BUS_KEY) || "[]").map(normalizeTiming);
+    const localTimings = JSON.parse(localStorage.getItem(BUS_KEY) || "[]").map(normalizeTiming);
+    pendingTimingsCache = localTimings.filter((timing) => timing.status === "pending");
+    approvedTimingsCache = localTimings.filter((timing) => timing.status !== "pending");
     userStopsCache = JSON.parse(localStorage.getItem(STOP_KEY) || "[]").map(normalizeStop);
   }
 
   async function loadFirestoreData() {
-    const [timingsSnapshot, stopsSnapshot] = await Promise.all([
-      firestoreDb.collection(TIMINGS_COLLECTION).get(),
+    const [pendingSnapshot, approvedSnapshot, stopsSnapshot] = await Promise.all([
+      firestoreDb.collection(PENDING_COLLECTION).get(),
+      firestoreDb.collection(APPROVED_COLLECTION).get(),
       firestoreDb.collection(STOPS_COLLECTION).get()
     ]);
 
-    timingsCache = timingsSnapshot.docs.map((doc) => normalizeTiming({ id: doc.id, ...doc.data() }));
+    pendingTimingsCache = pendingSnapshot.docs.map((doc) => normalizeTiming({ id: doc.id, ...doc.data(), status: "pending" }));
+    approvedTimingsCache = approvedSnapshot.docs.map((doc) => normalizeTiming({ id: doc.id, ...doc.data(), status: "approved" }));
     userStopsCache = stopsSnapshot.docs.map((doc) => normalizeStop({ id: doc.id, ...doc.data() }));
 
-    localStorage.setItem(BUS_KEY, JSON.stringify(timingsCache));
+    localStorage.setItem(BUS_KEY, JSON.stringify(getTimings()));
     localStorage.setItem(STOP_KEY, JSON.stringify(userStopsCache));
+  }
+
+  async function seedApprovedTimings(timings) {
+    approvedTimingsCache = timings.map((timing) => normalizeTiming({ ...timing, status: "approved" }));
+    localStorage.setItem(BUS_KEY, JSON.stringify(getTimings()));
+    if (!firestoreEnabled) return;
+
+    const batch = firestoreDb.batch();
+    approvedTimingsCache.forEach((timing) => {
+      batch.set(firestoreDb.collection(APPROVED_COLLECTION).doc(timing.id), toFirestoreTiming(timing, "approved"));
+    });
+    await batch.commit();
   }
 
   function seedLocalData() {
@@ -473,13 +492,92 @@
   }
 
   function getTimings() {
-    return timingsCache.map(normalizeTiming);
+    return [...pendingTimingsCache, ...approvedTimingsCache].map(normalizeTiming);
   }
 
-  async function saveTimings(timings) {
-    timingsCache = timings.map(normalizeTiming);
-    localStorage.setItem(BUS_KEY, JSON.stringify(timingsCache));
-    if (firestoreEnabled) await syncCollection(TIMINGS_COLLECTION, timingsCache);
+  function getPendingTimings() {
+    return pendingTimingsCache.map(normalizeTiming);
+  }
+
+  function getApprovedTimings() {
+    return approvedTimingsCache.map(normalizeTiming);
+  }
+
+  function saveLocalTimingCaches() {
+    localStorage.setItem(BUS_KEY, JSON.stringify(getTimings()));
+  }
+
+  async function savePendingTiming(timing) {
+    const normalized = normalizeTiming({ ...timing, status: "pending" });
+    pendingTimingsCache = upsertTiming(pendingTimingsCache, normalized);
+    approvedTimingsCache = approvedTimingsCache.filter((item) => item.id !== normalized.id);
+    saveLocalTimingCaches();
+
+    // User submissions are written to pendingTimings so every admin device can review them.
+    if (firestoreEnabled) {
+      await firestoreDb.collection(PENDING_COLLECTION).doc(normalized.id).set(toFirestoreTiming(normalized, "pending"));
+    }
+  }
+
+  async function saveApprovedTiming(timing) {
+    const normalized = normalizeTiming({ ...timing, status: "approved" });
+    approvedTimingsCache = upsertTiming(approvedTimingsCache, normalized);
+    pendingTimingsCache = pendingTimingsCache.filter((item) => item.id !== normalized.id);
+    saveLocalTimingCaches();
+
+    // Approved timings are written to approvedTimings, which powers public search results.
+    if (firestoreEnabled) {
+      await firestoreDb.collection(APPROVED_COLLECTION).doc(normalized.id).set(toFirestoreTiming(normalized, "approved"));
+      await firestoreDb.collection(PENDING_COLLECTION).doc(normalized.id).delete();
+    }
+  }
+
+  async function deletePendingTiming(id) {
+    pendingTimingsCache = pendingTimingsCache.filter((timing) => timing.id !== id);
+    saveLocalTimingCaches();
+    if (firestoreEnabled) await firestoreDb.collection(PENDING_COLLECTION).doc(id).delete();
+  }
+
+  async function deleteApprovedTiming(id) {
+    approvedTimingsCache = approvedTimingsCache.filter((timing) => timing.id !== id);
+    saveLocalTimingCaches();
+    if (firestoreEnabled) await firestoreDb.collection(APPROVED_COLLECTION).doc(id).delete();
+  }
+
+  async function resetApprovedTimings() {
+    approvedTimingsCache = sampleTimings.map((timing) => normalizeTiming({ ...timing, status: "approved" }));
+    saveLocalTimingCaches();
+    if (firestoreEnabled) await syncCollection(APPROVED_COLLECTION, approvedTimingsCache.map((timing) => toFirestoreTiming(timing, "approved")));
+  }
+
+  function upsertTiming(list, timing) {
+    const index = list.findIndex((item) => item.id === timing.id);
+    if (index === -1) return [...list, timing];
+    return list.map((item) => item.id === timing.id ? timing : item);
+  }
+
+  function toFirestoreTiming(timing, status) {
+    const normalized = normalizeTiming({ ...timing, status });
+    const now = new Date().toISOString();
+    return {
+      id: normalized.id,
+      busNumber: normalized.busNumber,
+      busName: normalized.busName,
+      from: normalized.from,
+      to: normalized.to,
+      departureTime: normalized.departure,
+      arrivalTime: normalized.arrival,
+      busType: normalized.type,
+      fare: normalized.fare,
+      duration: normalized.duration,
+      routeDetails: normalized.routeDetails,
+      busStops: normalized.busStops,
+      notes: normalized.notes,
+      status,
+      lastUpdated: normalized.lastUpdated,
+      createdAt: normalized.createdAt || now,
+      approvedAt: status === "approved" ? (normalized.approvedAt || now) : null
+    };
   }
 
   function getUserStops() {
@@ -500,6 +598,32 @@
     userStopsCache = unique;
     localStorage.setItem(STOP_KEY, JSON.stringify(unique));
     if (firestoreEnabled) await syncCollection(STOPS_COLLECTION, unique);
+  }
+
+  function usingSharedDatabase() {
+    return Boolean(firestoreEnabled && firestoreDb);
+  }
+
+  function updateStorageLabels() {
+    const meta = document.getElementById("resultsMeta");
+    if (meta && meta.dataset.ready !== "true") {
+      meta.textContent = usingSharedDatabase()
+        ? "Showing approved timings from the shared online database."
+        : "Showing timings saved in this browser only. Firestore is not connected.";
+    }
+  }
+
+  function showMessage(id, message) {
+    const element = document.getElementById(id);
+    if (!element) return;
+    if (message) element.textContent = message;
+    element.classList.remove("hidden");
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function hideMessage(id) {
+    const element = document.getElementById(id);
+    if (element) element.classList.add("hidden");
   }
 
   async function syncCollection(collectionName, records) {
@@ -764,7 +888,7 @@
     const type = params.get("type") || "All";
     const date = params.get("date") || today();
 
-    const approved = getTimings().filter((timing) => timing.status === "approved");
+    const approved = getApprovedTimings();
     const results = approved.filter((timing) => {
       const fromSearch = normalize(canonicalPlace(from));
       const toSearch = normalize(canonicalPlace(to));
@@ -779,7 +903,11 @@
     const title = document.getElementById("resultsTitle");
     const meta = document.getElementById("resultsMeta");
     if (title) title.textContent = from && to ? `${from} to ${to}` : "Available buses";
-    if (meta) meta.textContent = `${results.length} approved timing${results.length === 1 ? "" : "s"} for ${date}, ${type} bus type.`;
+    if (meta) {
+      const source = usingSharedDatabase() ? "shared online database" : "this browser only";
+      meta.dataset.ready = "true";
+      meta.textContent = `${results.length} approved timing${results.length === 1 ? "" : "s"} for ${date}, ${type} bus type from ${source}.`;
+    }
 
     list.innerHTML = results.length
       ? results.map(renderBusCard).join("")
@@ -799,15 +927,23 @@
         createdAt: today()
       };
 
-      await saveUserStops([...getUserStops(), stop]);
-      form.reset();
-      fillPlaceLists();
-      refreshDistrictStopSelectors();
+      hideMessage("stopSuccess");
+      hideMessage("stopError");
 
-      const success = document.getElementById("stopSuccess");
-      if (success) {
-        success.classList.remove("hidden");
-        success.scrollIntoView({ behavior: "smooth", block: "center" });
+      try {
+        await saveUserStops([...getUserStops(), stop]);
+        form.reset();
+        fillPlaceLists();
+        refreshDistrictStopSelectors();
+
+        if (usingSharedDatabase()) {
+          showMessage("stopSuccess", "Bus stop saved online. It will show on mobile and laptop.");
+        } else {
+          showMessage("stopError", "Bus stop saved only in this browser. Open the Firebase-hosted website and check Firestore setup.");
+        }
+      } catch (error) {
+        console.error("Could not save bus stop online.", error);
+        showMessage("stopError", "Bus stop was not saved online. Check Firestore rules and internet connection.");
       }
     });
   }
@@ -834,28 +970,30 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const timing = timingFromForm(form, "pending");
-      const timings = getTimings();
-      const existingIndex = timings.findIndex((item) =>
+      const existing = getTimings().find((item) =>
         normalize(item.busNumber) === normalize(timing.busNumber) &&
         normalize(canonicalPlace(item.from)) === normalize(canonicalPlace(timing.from)) &&
         normalize(canonicalPlace(item.to)) === normalize(canonicalPlace(timing.to))
       );
 
-      if (existingIndex >= 0) {
-        timing.id = timings[existingIndex].id;
-        timings[existingIndex] = timing;
-      } else {
-        timings.push(timing);
-      }
+      if (existing) timing.id = existing.id;
 
-      await saveTimings(timings);
-      form.reset();
-      const success = document.getElementById("updateSuccess");
-      if (success) {
-        success.classList.remove("hidden");
-        success.scrollIntoView({ behavior: "smooth", block: "center" });
+      hideMessage("updateSuccess");
+      hideMessage("updateError");
+
+      try {
+        await savePendingTiming(timing);
+        form.reset();
+        if (usingSharedDatabase()) {
+          showMessage("updateSuccess", "Timing saved online. Open Admin on your laptop and approve it.");
+        } else {
+          showMessage("updateError", "Timing saved only in this browser. Open the Firebase-hosted website and check Firestore setup.");
+        }
+        fillPlaceLists();
+      } catch (error) {
+        console.error("Could not save timing online.", error);
+        showMessage("updateError", "Timing was not saved online. Check Firestore rules and internet connection.");
       }
-      fillPlaceLists();
     });
   }
 
@@ -876,6 +1014,7 @@
       busStops: String(data.get("busStops") || "").trim(),
       notes: String(data.get("notes") || "").trim(),
       status: data.get("status") || status,
+      createdAt: data.get("createdAt") || new Date().toISOString(),
       lastUpdated: today()
     };
   }
@@ -919,7 +1058,7 @@
 
     resetBtn.addEventListener("click", async () => {
       if (confirm("Reset timings to the loaded TNSTC data?")) {
-        await saveTimings(sampleTimings);
+        await resetApprovedTimings();
         renderAdminLists();
       }
     });
@@ -939,8 +1078,11 @@
     editForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const updated = timingFromForm(editForm, editForm.elements.status.value);
-      const timings = getTimings().map((item) => item.id === updated.id ? updated : item);
-      await saveTimings(timings);
+      if (updated.status === "approved") {
+        await saveApprovedTiming(updated);
+      } else {
+        await savePendingTiming(updated);
+      }
       editDialog.close();
       renderAdminLists();
     });
@@ -955,9 +1097,8 @@
     const userStopsList = document.getElementById("userStopsList");
     if (!pendingList || !approvedList) return;
 
-    const timings = getTimings();
-    const pending = timings.filter((timing) => timing.status === "pending");
-    const approved = timings.filter((timing) => timing.status === "approved");
+    const pending = getPendingTimings();
+    const approved = getApprovedTimings();
 
     pendingList.innerHTML = pending.length
       ? pending.map((timing) => renderBusCard(timing, true)).join("")
@@ -1004,17 +1145,20 @@
   }
 
   async function approveTiming(id) {
-    const timings = getTimings().map((timing) => {
-      if (timing.id !== id) return timing;
-      return { ...timing, status: "approved", lastUpdated: today() };
-    });
-    await saveTimings(timings);
+    const timing = getPendingTimings().find((item) => item.id === id);
+    if (!timing) return;
+    await saveApprovedTiming({ ...timing, status: "approved", approvedAt: new Date().toISOString(), lastUpdated: today() });
     renderAdminLists();
   }
 
   async function deleteTiming(id) {
     if (!confirm("Delete this timing?")) return;
-    await saveTimings(getTimings().filter((timing) => timing.id !== id));
+    const pending = getPendingTimings().some((timing) => timing.id === id);
+    if (pending) {
+      await deletePendingTiming(id);
+    } else {
+      await deleteApprovedTiming(id);
+    }
     renderAdminLists();
   }
 
@@ -1083,15 +1227,25 @@
     const from = canonicalPlace(timing.from);
     const to = canonicalPlace(timing.to);
     const id = timing.id || `bus-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const departure = timing.departure || timing.departureTime || "";
+    const arrival = timing.arrival || timing.arrivalTime || "";
+    const type = timing.type || timing.busType || "";
     return {
       ...timing,
       id,
       from,
       to,
-      busName: timing.busName || `${timing.type || "Bus"} ${from || ""} - ${to || ""}`.trim(),
+      departure,
+      arrival,
+      type,
+      busName: timing.busName || `${type || "Bus"} ${from || ""} - ${to || ""}`.trim(),
       fare: timing.fare || "Not updated",
-      duration: timing.duration || calculateDuration(timing.departure, timing.arrival),
-      busStops: timing.busStops || timing.routeDetails || "Stop details not updated"
+      duration: timing.duration || calculateDuration(departure, arrival),
+      routeDetails: timing.routeDetails || "",
+      notes: timing.notes || "",
+      busStops: timing.busStops || timing.routeDetails || "Stop details not updated",
+      status: timing.status || "approved",
+      lastUpdated: timing.lastUpdated || today()
     };
   }
 

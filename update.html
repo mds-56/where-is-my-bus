@@ -32,8 +32,10 @@
       <p>Submit a new timing or correction. Bus stops appear immediately; timing updates appear publicly after admin approval.</p>
     </section>
 
-    <div class="alert success hidden" id="updateSuccess">Timing submitted successfully. Admin approval is pending.</div>
-    <div class="alert success hidden" id="stopSuccess">Bus stop added. You can now use it in From, To, and Bus stop names.</div>
+    <div class="alert success hidden" id="updateSuccess">Timing saved online. Admin approval is pending.</div>
+    <div class="alert error hidden" id="updateError">Timing was saved only in this browser. Please check Firestore setup.</div>
+    <div class="alert success hidden" id="stopSuccess">Bus stop saved online. You can now use it in From, To, and Bus stop names.</div>
+    <div class="alert error hidden" id="stopError">Bus stop was saved only in this browser. Please check Firestore setup.</div>
 
     <section class="stop-panel">
       <h2>Create new bus stop</h2>
@@ -171,7 +173,7 @@
   <datalist id="placeList"></datalist>
 
   <footer class="footer">
-    <p>Contact: whereismybus.support@gmail.com | +91 98765 43210</p>
+    <p>Contact: whereismybus.support@gmail.com | +91 8248534031</p>
     <p>Built for Tamil Nadu bus passengers.</p>
   </footer>
 
