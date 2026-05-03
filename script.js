@@ -5,6 +5,14 @@
   const PENDING_COLLECTION = "pendingTimings";
   const APPROVED_COLLECTION = "approvedTimings";
   const STOPS_COLLECTION = "busStops";
+  const firebaseConfig = {
+    apiKey: "AIzaSyAUEvlygLtYHqkw5a-tWvRInPCK5iAdxNM",
+    authDomain: "where-is-my-bus-tn.firebaseapp.com",
+    projectId: "where-is-my-bus-tn",
+    storageBucket: "where-is-my-bus-tn.firebasestorage.app",
+    messagingSenderId: "312741418293",
+    appId: "1:312741418293:web:7fda51f4ece7d4197ae87c"
+  };
 
   let firestoreDb = null;
   let firestoreEnabled = false;
@@ -423,10 +431,8 @@
   });
 
   async function initializeDataStore() {
-    if (window.firebase && firebase.apps && firebase.apps.length && firebase.firestore) {
+    if (connectFirestore()) {
       try {
-        firestoreDb = firebase.firestore();
-        firestoreEnabled = true;
         await loadFirestoreData();
         if (!approvedTimingsCache.length) {
           await seedApprovedTimings(sampleTimings);
@@ -444,6 +450,14 @@
     pendingTimingsCache = localTimings.filter((timing) => timing.status === "pending");
     approvedTimingsCache = localTimings.filter((timing) => timing.status !== "pending");
     userStopsCache = JSON.parse(localStorage.getItem(STOP_KEY) || "[]").map(normalizeStop);
+  }
+
+  function connectFirestore() {
+    if (!window.firebase || !firebase.firestore) return false;
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    firestoreDb = firebase.firestore();
+    firestoreEnabled = true;
+    return true;
   }
 
   async function loadFirestoreData() {
@@ -509,39 +523,41 @@
 
   async function savePendingTiming(timing) {
     const normalized = normalizeTiming({ ...timing, status: "pending" });
+
+    // User submissions are written to pendingTimings so every admin device can review them.
+    if (!usingSharedDatabase()) throw new Error("Firestore is not connected.");
+    await firestoreDb.collection(PENDING_COLLECTION).doc(normalized.id).set(toFirestoreTiming(normalized, "pending"));
+
     pendingTimingsCache = upsertTiming(pendingTimingsCache, normalized);
     approvedTimingsCache = approvedTimingsCache.filter((item) => item.id !== normalized.id);
     saveLocalTimingCaches();
-
-    // User submissions are written to pendingTimings so every admin device can review them.
-    if (firestoreEnabled) {
-      await firestoreDb.collection(PENDING_COLLECTION).doc(normalized.id).set(toFirestoreTiming(normalized, "pending"));
-    }
   }
 
   async function saveApprovedTiming(timing) {
     const normalized = normalizeTiming({ ...timing, status: "approved" });
+
+    // Approved timings are written to approvedTimings, which powers public search results.
+    if (!usingSharedDatabase()) throw new Error("Firestore is not connected.");
+    await firestoreDb.collection(APPROVED_COLLECTION).doc(normalized.id).set(toFirestoreTiming(normalized, "approved"));
+    await firestoreDb.collection(PENDING_COLLECTION).doc(normalized.id).delete();
+
     approvedTimingsCache = upsertTiming(approvedTimingsCache, normalized);
     pendingTimingsCache = pendingTimingsCache.filter((item) => item.id !== normalized.id);
     saveLocalTimingCaches();
-
-    // Approved timings are written to approvedTimings, which powers public search results.
-    if (firestoreEnabled) {
-      await firestoreDb.collection(APPROVED_COLLECTION).doc(normalized.id).set(toFirestoreTiming(normalized, "approved"));
-      await firestoreDb.collection(PENDING_COLLECTION).doc(normalized.id).delete();
-    }
   }
 
   async function deletePendingTiming(id) {
+    if (!usingSharedDatabase()) throw new Error("Firestore is not connected.");
+    await firestoreDb.collection(PENDING_COLLECTION).doc(id).delete();
     pendingTimingsCache = pendingTimingsCache.filter((timing) => timing.id !== id);
     saveLocalTimingCaches();
-    if (firestoreEnabled) await firestoreDb.collection(PENDING_COLLECTION).doc(id).delete();
   }
 
   async function deleteApprovedTiming(id) {
+    if (!usingSharedDatabase()) throw new Error("Firestore is not connected.");
+    await firestoreDb.collection(APPROVED_COLLECTION).doc(id).delete();
     approvedTimingsCache = approvedTimingsCache.filter((timing) => timing.id !== id);
     saveLocalTimingCaches();
-    if (firestoreEnabled) await firestoreDb.collection(APPROVED_COLLECTION).doc(id).delete();
   }
 
   async function resetApprovedTimings() {
